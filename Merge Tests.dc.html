@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>body{margin:0;background:#F4F4F4;font-family:system-ui,sans-serif;color:#030303}</style></helmet>
+<div style="max-width:760px;margin:0 auto;padding:28px 24px;display:flex;flex-direction:column;gap:14px">
+  <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#047A3C">Brand CRM backend · unit tests</div>
+  <h1 style="margin:0;font-size:20px;font-weight:600">Field-level merge (crm-backend/src/shared.js)</h1>
+  <div style="font-size:13px;color:rgba(3,3,3,.65)">{{ summary }}</div>
+  <sc-for list="{{ results }}" as="r" hint-placeholder-count="6">
+    <div style="{{ r.style }}">
+      <div style="display:flex;gap:10px;align-items:baseline"><span style="font-weight:700;font-size:12px;min-width:44px">{{ r.badge }}</span><span style="font-size:13.5px;font-weight:600">{{ r.name }}</span></div>
+      <div style="font-size:12.5px;color:rgba(3,3,3,.7);margin-top:4px;white-space:pre-wrap;font-family:ui-monospace,monospace">{{ r.detail }}</div>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { results: [], summary: 'Running…' };
+  async componentDidMount() {
+    const m = await import('./src/shared.js');
+    const T = [];
+    const t = (name, fn) => { try { const d = fn(); T.push({ ok: true, name, detail: d || 'ok' }); } catch (e) { T.push({ ok: false, name, detail: String(e.message || e) }); } };
+    const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((msg || 'mismatch') + '\nexpected ' + JSON.stringify(b) + '\ngot      ' + JSON.stringify(a)); };
+    t('Two users edit different fields of the same record → both kept', () => {
+      let s = m.mergeFields(null, { fields: { status: 'Engaged', owner: 'Oisin' }, ts: 1000 }, 1000);
+      const a = m.mergeFields(s, { fields: { priority: 'High' }, ts: 2000 }, 2000);
+      const b = m.mergeFields(a, { fields: { owner: 'Cecile' }, ts: 2001 }, 2001);
+      eq(b.data, { status: 'Engaged', owner: 'Cecile', priority: 'High' });
+      eq(b.conflicts, []);
+      return JSON.stringify(b.data);
+    });
+    t('Older edit arriving late does not overwrite a newer value → reported as conflict', () => {
+      const s = m.mergeFields(null, { fields: { priority: 'High' }, ts: 5000 }, 5000);
+      const r = m.mergeFields(s, { fields: { priority: 'Low' }, ts: 4000 }, 4000);
+      eq(r.data.priority, 'High');
+      eq(r.applied, []);
+      eq(r.conflicts.length, 1);
+      eq(r.conflicts[0].field, 'priority');
+      return 'kept High, conflict reported for Low';
+    });
+    t('Same value re-sent with an older timestamp is not a conflict', () => {
+      const s = m.mergeFields(null, { fields: { owner: 'Niall' }, ts: 5000 }, 5000);
+      const r = m.mergeFields(s, { fields: { owner: 'Niall' }, ts: 4000 }, 4000);
+      eq(r.conflicts, []); eq(r.applied, []);
+    });
+    t('Per-field timestamps are honoured (ts given as a map)', () => {
+      const s = m.mergeFields(null, { fields: { a: 1, b: 1 }, ts: { a: 100, b: 900 } }, 1);
+      const r = m.mergeFields(s, { fields: { a: 2, b: 2 }, ts: { a: 500, b: 500 } }, 1);
+      eq(r.data, { a: 2, b: 1 });
+      eq(r.conflicts.map(c => c.field), ['b']);
+    });
+    t('Nested values (nextAction object, contacts array) merge as whole fields', () => {
+      const s = m.mergeFields(null, { fields: { nextAction: { text: 'Send outreach message 1', due: '2026-11-06' } }, ts: 10 }, 10);
+      const r = m.mergeFields(s, { fields: { nextAction: { text: 'Send outreach message 1', due: '2026-11-13' }, contacts: [{ name: 'Pia-Maria Issa' }] }, ts: 20 }, 20);
+      eq(r.data.nextAction.due, '2026-11-13'); eq(r.data.contacts.length, 1);
+    });
+    t('Internal keys (_f, _ts, _by, _at) are never treated as data', () => {
+      const r = m.mergeFields(null, { fields: { _ts: 1, _f: {}, status: 'Declined' }, ts: 10 }, 10);
+      eq(Object.keys(r.data), ['status']);
+    });
+    t('changedFields() lists only fields that differ from the last synced copy', () => {
+      const prev = { status: 'Engaged', owner: 'Oisin', _ts: 5 };
+      const cur = { status: 'Engaged', owner: 'Cecile', priority: 'High', _ts: 9 };
+      eq(m.changedFields(cur, prev), { owner: 'Cecile', priority: 'High' });
+      eq(m.changedFields(cur, null), { status: 'Engaged', owner: 'Cecile', priority: 'High' });
+    });
+    const pass = T.filter(x => x.ok).length;
+    this.setState({ results: T.map(x => ({ name: x.name, detail: x.detail, badge: x.ok ? 'PASS' : 'FAIL', style: 'border:1px solid ' + (x.ok ? 'rgba(4,122,60,.35)' : 'rgba(180,35,24,.45)') + ';background:#fff;border-radius:10px;padding:12px 14px;color:' + (x.ok ? '#047A3C' : '#B42318') })), summary: pass + ' of ' + T.length + ' passed' });
+  }
+  renderVals() { return this.state; }
+}
+</script>
+</body>
+</html>

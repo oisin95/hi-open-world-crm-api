@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>body{margin:0;background:#F4F4F4;font-family:system-ui,sans-serif;color:#030303}a{color:#047A3C}a:hover{color:#035C2D}</style></helmet>
+<div style="max-width:1100px;margin:0 auto;padding:28px 24px 80px;display:flex;flex-direction:column;gap:18px">
+  <div>
+    <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#047A3C">Brand CRM · migration</div>
+    <h1 style="margin:4px 0 0;font-size:22px;font-weight:600">Merge preview</h1>
+    <p style="margin:6px 0 0;font-size:13.5px;line-height:1.5;color:rgba(3,3,3,.65);max-width:70ch">Load every colleague's "Back up this device" file. Records are matched by brand ID; fields that agree are combined, fields that differ are listed for your decision. Nothing is uploaded — the result is a merged file you download and review.</p>
+  </div>
+
+  <div style="background:#fff;border:1px solid rgba(3,3,3,.12);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+    <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600">Backup files (select several)
+      <input type="file" accept="application/json,.json" multiple onChange="{{ onFiles }}" style="font-size:13px">
+    </label>
+    <sc-if value="{{ hasFiles }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ files }}" as="f" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px solid rgba(3,3,3,.08)">
+            <span style="{{ f.dot }}"></span>
+            <span style="min-width:0"><strong>{{ f.user }}</strong> · {{ f.name }}<span style="color:rgba(3,3,3,.55)"> · exported {{ f.when }} · {{ f.counts }}</span></span>
+            <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer"><input type="radio" name="mp-master" value="{{ f.i }}" onChange="{{ setMaster }}" checked="{{ f.isMaster }}" style="accent-color:#047A3C">Default for conflicts</label>
+          </div>
+        </sc-for>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" checked="{{ dropSample }}" onChange="{{ toggleSample }}" style="accent-color:#047A3C">Leave out demo/sample entries (marked "sample" in the old prototype)</label>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ hasFiles }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+      <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+        <div style="background:#fff;border:1px solid rgba(3,3,3,.12);border-radius:12px;padding:12px 14px"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:rgba(3,3,3,.55)">{{ s.k }}</div><div style="font-size:22px;font-weight:600;margin-top:2px;color:{{ s.color }}">{{ s.v }}</div></div>
+      </sc-for>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(3,3,3,.12);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><span style="font-size:14px;font-weight:600">Conflicts to review ({{ conflictCount }})</span><span style="font-size:12px;color:rgba(3,3,3,.55)">Pick the value to keep for each. Unpicked conflicts use the default file.</span></div>
+      <sc-if value="{{ noConflicts }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#047A3C">No conflicting values — every difference was a field present in only one file.</div></sc-if>
+      <sc-for list="{{ conflicts }}" as="c" hint-placeholder-count="3">
+        <div style="border-top:1px solid rgba(3,3,3,.08);padding:10px 0;display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:13px"><strong>{{ c.brand }}</strong> <span style="color:rgba(3,3,3,.55)">· {{ c.fieldLabel }}</span></div>
+          <sc-for list="{{ c.options }}" as="o" hint-placeholder-count="2">
+            <label style="display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px;align-items:start;font-size:12.5px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="{{ c.key }}" value="{{ o.i }}" checked="{{ o.checked }}" onChange="{{ o.pick }}" style="accent-color:#047A3C;margin-top:2px">
+              <span><code style="background:#F4F4F4;border-radius:6px;padding:2px 6px;font-size:12px;overflow-wrap:anywhere">{{ o.value }}</code><span style="color:rgba(3,3,3,.55)"> — {{ o.from }}</span><span style="color:#7A5A00">{{ o.hint }}</span></span>
+            </label>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(3,3,3,.12);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:14px;font-weight:600">Fields filled from a single file ({{ fillCount }})</div>
+      <div style="font-size:12.5px;color:rgba(3,3,3,.65)">These values existed in only one backup and are included as-is.</div>
+      <div style="font-size:12.5px;line-height:1.6;max-height:220px;overflow:auto;white-space:pre-wrap">{{ fillSummary }}</div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button onClick="{{ download }}" style="border:none;cursor:pointer;background:#047A3C;color:#fff;border-radius:999px;padding:10px 18px;font-weight:600;font-size:13.5px;font-family:inherit">Download merged file</button>
+      <button onClick="{{ downloadReport }}" style="border:1px solid rgba(3,3,3,.2);cursor:pointer;background:#fff;color:#030303;border-radius:999px;padding:10px 18px;font-weight:600;font-size:13.5px;font-family:inherit">Download review report</button>
+      <span style="font-size:12.5px;color:rgba(3,3,3,.55)">The merged file is what you upload as the shared starting point. Your original backups are untouched.</span>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { files: [], master: 0, picks: {}, dropSample: true };
+  SKIP = { _f: 1, _ts: 1, _by: 1, _at: 1 };
+  LABELS = { status: 'Status', priority: 'Priority', owner: 'Owner', update: 'Last action', lastDate: 'Last action date', nextAction: 'Next action', nextDue: 'Next action date', contacts: 'Contacts', keyContact: 'Key contact', contactEdits: 'Contact edits', hiddenContacts: 'Hidden contacts', oppTypes: 'Opportunity type', existingPartner: 'Existing partner', products: 'Proposed products', phones: 'Phone contacts', affiliate: 'Affiliate prospect', website: 'Website' };
+  j(x) { return JSON.stringify(x); }
+  short(v) { if (v === undefined) return '(not set)'; if (v === null) return '(cleared)'; if (typeof v !== 'object') return String(v); const s = this.j(v); return s.length > 140 ? s.slice(0, 140) + '…' : s; }
+  hint(v) { if (v && typeof v === 'object') { const t = v.ts || v.createdAt || v._ts; if (t) return ' · dated ' + new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); if (v.date || v.due) return ' · ' + (v.date || v.due); } return ''; }
+  async loadFiles(list) {
+    const files = [];
+    for (const f of list) {
+      try {
+        const o = JSON.parse(await f.text());
+        const d = o && o.data && o.data.records ? o.data : (o && o.records ? o : null);
+        if (!d) { files.push({ name: f.name, error: 'not a Brand CRM backup' }); continue; }
+        files.push({ name: f.name, user: o.user || '(unknown user)', exportedAt: o.exportedAt || '', data: d });
+      } catch (e) { files.push({ name: f.name, error: String(e.message || e) }); }
+    }
+    this.setState({ files, picks: {}, master: 0 });
+  }
+  merge() {
+    const files = this.state.files.filter(f => !f.error), drop = this.state.dropSample, picks = this.state.picks, master = Math.min(this.state.master, Math.max(0, files.length - 1));
+    const names = {}; // brand id → display name from any file's added list, else id
+    files.forEach(f => (f.data.added || []).forEach(b => { if (b && b.id) names[b.id] = b.name; }));
+    const ids = new Set(); files.forEach(f => Object.keys(f.data.records || {}).forEach(id => ids.add(id)));
+    const records = {}, conflicts = [], fills = [];
+    for (const id of ids) {
+      const fields = new Set(); files.forEach(f => Object.keys((f.data.records || {})[id] || {}).forEach(k => { if (!this.SKIP[k]) fields.add(k); }));
+      const out = {};
+      for (const fld of fields) {
+        const vals = files.map((f, i) => ({ i, v: ((f.data.records || {})[id] || {})[fld] })).filter(x => x.v !== undefined && !(drop && x.v && typeof x.v === 'object' && x.v.sample));
+        const distinct = []; vals.forEach(x => { const s = this.j(x.v); let g = distinct.find(d => d.s === s); if (!g) { g = { s, v: x.v, from: [] }; distinct.push(g); } g.from.push(x.i); });
+        if (!distinct.length) continue;
+        if (distinct.length === 1) { out[fld] = distinct[0].v; if (vals.length < files.length) fills.push({ id, fld, from: distinct[0].from }); continue; }
+        const key = id + '::' + fld;
+        let chosen = picks[key]; if (chosen === undefined) { const m = distinct.findIndex(d => d.from.includes(master)); chosen = m >= 0 ? m : 0; }
+        out[fld] = distinct[chosen].v;
+        conflicts.push({ id, fld, key, distinct, chosen });
+      }
+      if (Object.keys(out).length) records[id] = out;
+    }
+    const seen = {}, activity = []; files.forEach(f => (f.data.activity || []).forEach(a => { if (!a || !a.id || seen[a.id] || (drop && a.sample)) return; seen[a.id] = 1; activity.push(a); })); activity.sort((p, q) => (q.ts || 0) - (p.ts || 0));
+    const seenAdd = {}, added = []; files.forEach(f => (f.data.added || []).forEach(b => { if (!b || !b.id || seenAdd[b.id]) return; seenAdd[b.id] = 1; added.push(b); }));
+    const mig = {}; files.forEach(f => Object.keys(f.data).forEach(k => { if (/^mig_/.test(k)) mig[k] = true; }));
+    return { files, records, activity, added, mig, conflicts, fills, names, master };
+  }
+  dl(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  renderVals() {
+    const m = this.merge(), files = this.state.files, stamp = new Date().toISOString().slice(0, 10);
+    const label = f => (f.user || '?') + (f.exportedAt ? ' (' + new Date(f.exportedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ')' : '');
+    const colors = ['#047A3C', '#0052CC', '#B45309', '#9A1C12', '#4A4A4A', '#7A5A00'];
+    const fileRows = files.map((f, i) => ({ i, name: f.name, user: f.error ? 'Unreadable' : f.user, when: f.exportedAt ? new Date(f.exportedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—', counts: f.error ? f.error : Object.keys(f.data.records || {}).length + ' records · ' + (f.data.activity || []).length + ' history', isMaster: i === m.master, dot: 'width:10px;height:10px;border-radius:50%;background:' + colors[i % colors.length] }));
+    const good = m.files;
+    const conflicts = m.conflicts.map(c => ({ brand: m.names[c.id] || c.id, fieldLabel: this.LABELS[c.fld] || c.fld, key: c.key, options: c.distinct.map((d, i) => ({ i, value: this.short(d.v), from: d.from.map(fi => label(good[fi])).join(', '), hint: this.hint(d.v), checked: i === c.chosen, pick: () => this.setState(s => ({ picks: Object.assign({}, s.picks, { [c.key]: i }) })) })) }));
+    const fillSummary = m.fills.slice(0, 400).map(f => (m.names[f.id] || f.id) + ' · ' + (this.LABELS[f.fld] || f.fld) + ' ← ' + f.from.map(fi => good[fi].user).join(', ')).join('\n') + (m.fills.length > 400 ? '\n… and ' + (m.fills.length - 400) + ' more' : '');
+    const merged = Object.assign({}, m.mig, { records: m.records, activity: m.activity, added: m.added, v: 2 });
+    return {
+      files: fileRows, hasFiles: files.length > 0, dropSample: this.state.dropSample,
+      onFiles: e => this.loadFiles(Array.from(e.target.files || [])),
+      setMaster: e => this.setState({ master: Number(e.target.value), picks: {} }),
+      toggleSample: e => this.setState({ dropSample: e.target.checked }),
+      stats: [{ k: 'Files', v: good.length, color: '#030303' }, { k: 'Brands with data', v: Object.keys(m.records).length, color: '#030303' }, { k: 'History entries', v: m.activity.length, color: '#030303' }, { k: 'Conflicts', v: m.conflicts.length, color: m.conflicts.length ? '#B42318' : '#047A3C' }],
+      conflicts, conflictCount: m.conflicts.length, noConflicts: good.length > 0 && m.conflicts.length === 0, fillCount: m.fills.length, fillSummary: fillSummary || '—',
+      download: () => this.dl('brand-crm-merged-' + stamp + '.json', JSON.stringify({ format: 'hiow-crm-export', version: 1, merged: true, exportedAt: new Date().toISOString(), user: 'merged', sources: good.map(f => ({ user: f.user, exportedAt: f.exportedAt, name: f.name })), decisions: m.conflicts.map(c => ({ brand: m.names[c.id] || c.id, id: c.id, field: c.fld, kept: c.distinct[c.chosen].v, keptFrom: c.distinct[c.chosen].from.map(fi => good[fi].user), rejected: c.distinct.filter((d, i) => i !== c.chosen).map(d => ({ value: d.v, from: d.from.map(fi => good[fi].user) })) })), data: merged }, null, 1)),
+      downloadReport: () => this.dl('brand-crm-merge-report-' + stamp + '.json', JSON.stringify({ generatedAt: new Date().toISOString(), files: good.map(f => ({ user: f.user, exportedAt: f.exportedAt, name: f.name, records: Object.keys(f.data.records || {}).length, history: (f.data.activity || []).length })), conflicts: m.conflicts.map(c => ({ brand: m.names[c.id] || c.id, id: c.id, field: c.fld, options: c.distinct.map((d, i) => ({ value: d.v, from: d.from.map(fi => good[fi].user), chosen: i === c.chosen })) })), filledFromSingleFile: m.fills.map(f => ({ brand: m.names[f.id] || f.id, id: f.id, field: f.fld, from: f.from.map(fi => good[fi].user) })) }, null, 1)),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>HI Open World · Brand CRM API</title>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#F4F4F4;color:#030303;display:grid;place-items:center;min-height:100vh}main{background:#fff;border:1px solid rgba(3,3,3,.12);border-radius:14px;padding:28px 32px;max-width:420px}h1{font-size:18px;margin:0 0 6px}p{margin:0;font-size:14px;line-height:1.5;color:rgba(3,3,3,.7)}code{background:#F1F1F1;border-radius:6px;padding:2px 6px}</style>
+</head>
+<body>
+<main>
+<h1>Brand CRM API</h1>
+<p>Service for the HI Open World Brand CRM. Status: <code id="s">checking…</code></p>
+<p style="margin-top:10px">Use the CRM at <a href="/brand-crm">/brand-crm</a>.</p>
+</main>
+<script type="module">
+fetch(`${import.meta.env.BASE_URL}api/health`).then(r => r.json()).then(j => { document.getElementById('s').textContent = j.ok ? 'running' : 'error'; }).catch(() => { document.getElementById('s').textContent = 'unreachable'; });
+</script>
+</body>
+</html>
