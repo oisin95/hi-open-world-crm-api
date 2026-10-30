@@ -1,8 +1,5 @@
 import { defineConfig } from 'vite';
-import { cloudflare } from '@cloudflare/vite-plugin';
 
-// The Cloudflare plugin builds src/worker.ts (declared as `main` in wrangler.json) alongside the static page.
-// Webflow Cloud sets `base` to the mount path at build time.
-export default defineConfig({
-  plugins: [cloudflare()],
-});
+// Webflow Cloud replaces this file with its own template at build time (it adds the Cloudflare plugin and the mount path).
+// Kept minimal so `npm run build` also works locally.
+export default defineConfig({});
