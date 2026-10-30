@@ -4,7 +4,11 @@
   "compatibility_date": "2025-04-15",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/worker.ts",
-  "run_worker_first": ["/api/*", "/app/api/*"],
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+    "run_worker_first": ["/api/*", "/app/api/*"]
+  },
   "d1_databases": [
     { "binding": "DB", "database_name": "crm", "database_id": "0" }
   ]

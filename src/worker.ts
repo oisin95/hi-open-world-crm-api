@@ -122,7 +122,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const i = url.pathname.indexOf('/api/');
-    if (i < 0) return env.ASSETS.fetch(request);
+    if (i < 0) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 });
     const route = url.pathname.slice(i + 4).replace(/\/+$/, '');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
     if (route === '/health') return json(request, { ok: true, service: 'hi-open-world-crm-api', time: new Date().toISOString() });
