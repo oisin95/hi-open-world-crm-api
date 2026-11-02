@@ -60,14 +60,26 @@ function rowToRecord(x: Row) { return Object.assign(JSON.parse(x.data), { _f: JS
 /** Field-level merge + write for many records. Each batch = one transaction containing the counter increment,
  *  so a reader can never observe the new revision without the rows that carry it (no gaps). Optimistic `rev`
  *  guard per row; rows changed concurrently by someone else are re-read and re-merged (up to 4 passes). */
-async function writeRecords(db: D1Database, items: { id: string; patch: Patch }[], who: string, now: number, report: Report, dryRun = false) {
+async function writeRecords(db: D1Database, items: { id: string; patch: Patch }[], who: string, now: number, report: Report, dryRun = false, minTs = 0) {
   let pending = items;
   const seen = new Set<string>();
   for (let attempt = 0; attempt < 4 && pending.length; attempt++) {
     const rows = await readRows(db, pending.map((x) => x.id));
     const plans: { id: string; stmt: D1PreparedStatement; n: number }[] = [];
-    for (const it of pending) {
+    for (let it of pending) {
       const row = rows[it.id];
+      if (minTs > 0) {
+        // Live sync: timestamps at or below the seed/import baseline are stale by definition (pre-migration data) and are refused even for empty fields.
+        const cur = row ? JSON.parse(row.data) : {};
+        const fields: Record<string, unknown> = {}, tsMap: Record<string, number> = {};
+        for (const f of Object.keys(it.patch.fields)) {
+          const t = typeof it.patch.ts === 'object' && it.patch.ts ? Number(it.patch.ts[f] || 0) : Number(it.patch.ts || 0);
+          if (t <= minTs) { const k = it.id + '\u0000' + f; if (!seen.has(k)) { seen.add(k); report.skipped++; report.conflicts.push({ id: it.id, field: f, yours: it.patch.fields[f], kept: cur[f], keptAt: 0, keptBy: row ? row.updated_by : '', reason: 'stale timestamp' }); } continue; }
+          fields[f] = it.patch.fields[f]; tsMap[f] = t;
+        }
+        it = { id: it.id, patch: { fields, ts: tsMap } };
+        if (!Object.keys(fields).length) continue;
+      }
       const m = mergeFields(row ? { data: JSON.parse(row.data), fts: JSON.parse(row.fts) } : null, it.patch, now);
       for (const c of m.conflicts) { const k = it.id + '\u0000' + c.field; if (!seen.has(k)) { seen.add(k); report.skipped++; report.conflicts.push(Object.assign({ id: it.id, keptBy: row ? row.updated_by : '' }, c)); } }
       if (!m.applied.length) continue;
@@ -128,7 +140,7 @@ async function handleSync(req: Request, env: Env, who: string): Promise<Response
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'invalid json' }, 400); }
   const db = env.DB, since = Math.max(0, Number(body.since) || 0), now = Date.now(), report = newReport();
-  await writeRecords(db, cleanPatches(body.records), who, now, report);
+  await writeRecords(db, cleanPatches(body.records), who, now, report, false, 2);
   const acts = Array.isArray(body.activity) ? body.activity.filter((a: any) => a && a.id && a.brandId && !a.sample).slice(0, 8000) : [];
   if (acts.length) await writeActivity(db, acts, now, report);
   const added = Array.isArray(body.added) ? body.added.filter((b: any) => b && b.id && b.name).slice(0, 500) : [];
@@ -203,6 +215,20 @@ async function handleTestPurge(env: Env): Promise<Response> {
   const res = await env.DB.batch([db_(env).prepare("DELETE FROM records WHERE substr(id, 1, 6) = '__test'"), db_(env).prepare("DELETE FROM activity WHERE substr(brand_id, 1, 6) = '__test'"), db_(env).prepare("DELETE FROM added WHERE substr(id, 1, 6) = '__test'"), db_(env).prepare(INC)]);
   return json({ ok: true, removed: res.slice(0, 3).map((r) => (r.meta && r.meta.changes) || 0) });
 }
+/** Admin: remove one field from one record (used to undo an unwanted write). Body {id, field}. */
+async function handleUnset(req: Request, env: Env, who: string): Promise<Response> {
+  let body: any;
+  try { body = await req.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  const id = String(body.id || ''), field = String(body.field || '');
+  if (!id || !field) return json({ error: 'id and field required' }, 400);
+  const row = await env.DB.prepare('SELECT * FROM records WHERE id = ?').bind(id).first<Row>();
+  if (!row) return json({ ok: false, error: 'record not found' }, 404);
+  const data = JSON.parse(row.data), fts = JSON.parse(row.fts);
+  const had = field in data; const previous = data[field];
+  delete data[field]; delete fts[field];
+  await env.DB.batch([env.DB.prepare(INC), env.DB.prepare('UPDATE records SET data = ?, fts = ?, rev = ' + REV + ', updated_at = ?, updated_by = ? WHERE id = ?').bind(JSON.stringify(data), JSON.stringify(fts), Date.now(), who + ' (admin)', id)]);
+  return json({ ok: true, id, field, removed: had, previous });
+}
 function db_(env: Env) { return env.DB; }
 
 export default {
@@ -212,7 +238,7 @@ export default {
     if (i < 0) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 });
     const route = url.pathname.slice(i + 4).replace(/\/+$/, '');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-    if (route === '/health') return json({ ok: true, service: 'hi-open-world-crm-api', version: '2.0.0', time: new Date().toISOString() });
+    if (route === '/health') return json({ ok: true, service: 'hi-open-world-crm-api', version: '2.0.1', time: new Date().toISOString() });
     if (!env.DB) return json({ error: 'database binding missing' }, 500);
     if (Number(request.headers.get('content-length') || 0) > MAX_BODY) return json({ error: 'payload too large' }, 413);
     const key = request.headers.get('x-crm-key') || '';
@@ -226,6 +252,7 @@ export default {
       if (route === '/stats' && request.method === 'GET') return handleStats(env);
       if (route === '/import' && request.method === 'POST') return handleImport(request, env, who);
       if (route === '/test' && request.method === 'DELETE') return handleTestPurge(env);
+      if (route === '/unset' && request.method === 'POST') return handleUnset(request, env, who);
       return json({ error: 'not found' }, 404);
     } catch (e: any) {
       return json({ error: 'server error', detail: String((e && e.message) || e) }, 500);
