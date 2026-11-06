@@ -54,7 +54,8 @@ if(a==='screen'){S.screen=val;S.menu=null;S.sel=null;S.panel={};R.render();rende
 else if(a==='view'){S.view=val;S.menu=null;R.render()}else if(a==='menu'){S.menu=S.menu===val?null:val;R.render()}
 else if(a==='chip'){var k=t.getAttribute('data-k');if(k==='due')S.F.due='any';else R.toggleIn(k,val);R.render()}
 else if(a==='clear'){R.resetFilters();R.render()}
-else if(a==='toggle'){S.open[id]=!(R.filterActive&&R.filterActive())&&!S.open[id];R.renderList()}
+else if(a==='toggle'){S.open[id]=!R.isOpen(id);R.renderList()}
+else if(a==='expandall'){S.openAll=true;S.open={};R.renderList()}else if(a==='collapseall'){S.openAll=false;S.open={};R.renderList()}
 else if(a==='open'){openAcc(id)}else if(a==='close'){closePanel()}
 else if(a==='star'){if(!acc)return;R.upd(acc.id,{priority:acc.star?'Medium':'High'});R.renderList();if(S.sel)renderPanel()}
 else if(a==='partner'){if(!acc)return;R.upd(acc.id,{existingPartner:!acc.partner});R.addAct(acc.id,'Update',acc.partner?'Existing partner flag removed':'Marked as existing partner');renderPanel()}
