@@ -53,7 +53,7 @@ document.addEventListener('click',function(ev){var t=ev.target.closest('[data-a]
 var a=t.getAttribute('data-a'),val=t.getAttribute('data-v')||'',id=t.getAttribute('data-id')||S.sel,acc=id?R.get(id):null,p=S.panel;
 if(a==='screen'){S.screen=val;S.menu=null;S.sel=null;S.panel={};R.render();renderPanel()}
 else if(a==='view'){S.view=val;S.menu=null;R.render()}else if(a==='menu'){S.menu=S.menu===val?null:val;R.render()}
-else if(a==='chip'){var k=t.getAttribute('data-k');if(k==='due')S.F.due='any';else R.toggleIn(k,val);R.render()}
+else if(a==='chip'){var k=t.getAttribute('data-k');if(k==='due')S.F.due='any';else if(k==='deal')S.F.deal='';else if(k==='nonext')S.F.nonext=false;else R.toggleIn(k,val);R.render()}
 else if(a==='clear'){R.resetFilters();R.render()}
 else if(a==='toggle'){S.open[id]=!R.isOpen(id);R.renderList()}
 else if(a==='expandall'){S.openAll=true;S.open={};R.renderList()}else if(a==='collapseall'){S.openAll=false;S.open={};R.renderList()}
@@ -85,7 +85,7 @@ else if(a==='askdel'){S.panel.confirmDel=true;renderPanel()}else if(a==='canceld
 else if(a==='delbrand'){if(!acc)return;R.upd(acc.brandId,{deletedAt:Date.now(),deletedBy:USER});R.addAct(acc.brandId,'Update','Brand deleted from the CRM by '+USER);S.sel=null;S.panel={};S.showDeleted=true;R.render();renderPanel()}
 else if(a==='restore'){R.upd(id,{deletedAt:null,deletedBy:null});R.addAct(id,'Update','Brand restored to the CRM by '+USER);R.render()}
 else if(a==='toggledel'){S.showDeleted=!S.showDeleted}
-else if(a==='go'){go({})}else if(a==='gostatus'){go({status:[val]})}else if(a==='gocat'){go({cat:[val]})}else if(a==='goowner'){go({owner:[val]})}else if(a==='godue'){go({view:'due'})}else if(a==='gohigh'){go({view:'high'})}
+else if(a==='go'){go({})}else if(a==='gostatus'){go({status:[val]})}else if(a==='gocat'){go({cat:[val]})}else if(a==='goowner'){go({owner:[val]})}else if(a==='godue'){if(val==='overdue'||val==='today')go({due:val});else go({view:'due'})}else if(a==='godeal'){go({deal:val||'all'})}else if(a==='gopipeline'){go({deal:'all'})}else if(a==='gononext'){go({nonext:true,deal:'all'})}else if(a==='gohigh'){go({view:'high'})}
 });
 document.addEventListener('change',function(ev){var t=ev.target,a=t.getAttribute('data-a');if(!a)return;var id=t.getAttribute('data-id')||S.sel,acc=id?R.get(id):null;
 if(a==='status'){if(!acc)return;setStatus(acc,t.value);R.renderList();if(S.sel===id)renderPanel()}
@@ -102,7 +102,7 @@ else if(a==='f'){R.toggleIn(t.getAttribute('data-k'),t.getAttribute('data-v'));R
 else if(a==='fr'){S.F[t.getAttribute('data-k')]=t.getAttribute('data-v');R.render()}});
 document.addEventListener('input',function(ev){if(ev.target.id==='rc-q'){S.F.q=ev.target.value;R.renderList()}});
 document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){if(S.menu){S.menu=null;R.render()}else if(S.sel||S.adding)closePanel()}});
-R.renderPanel=renderPanel;R.filterActive=function(){var F=S.F;return!!(F.q.trim()||F.status.length||F.owner.length||F.cat.length||F.prod.length||F.region.length||F.due!=='any'||S.view!=='all')};
+R.renderPanel=renderPanel;R.filterActive=function(){var F=S.F;return!!(F.q.trim()||F.status.length||F.owner.length||F.cat.length||F.prod.length||F.region.length||F.due!=='any'||F.deal||F.nonext||S.view!=='all')};
 if(!R.all().length){root.innerHTML='<div class="rc-card rc-empty">No published brands yet. Publish the Brands collection to populate this page.</div>';return}
 R.render();
 })();
